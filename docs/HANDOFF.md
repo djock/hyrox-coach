@@ -1,13 +1,12 @@
 # Handoff — finish the week-based refactor, then auto-deploy
 
 **Repo:** `~/Projects/Web/hyrox-coach` (remote `git@github.com:djock/hyrox-coach.git`)
-**HEAD:** `cabae5f` — *Add design brief; begin week-based queue refactor*
-**Working tree:** dirty, 7 modified files, **nothing committed since `cabae5f`**
-**Tests:** `139 passed, 5 failed`
-**Production:** live at https://hyrox.miloprogressive.fit, still running the
-commit *before* this refactor. Untouched and healthy. Do not deploy until the
-suite is green and the migration has been rehearsed against a copy of the prod
-database (§4).
+**Base HEAD:** `f3aba81` — *Week-based queue: engine, service and views; handoff for the remainder*
+**Working tree:** local changes include the completed test migration and Pi
+deployment workflow; nothing committed since `f3aba81`.
+**Tests:** `149 passed` (one TestClient deprecation warning)
+**Production:** migration rehearsal completed against a copy of the production
+database. The `hyrox-pi` runner is registered and online; pushing `main` deploys.
 
 Run tests with `.venv/bin/python -m pytest -q`. Run the app with `./scripts/dev.sh`
 (port 8099). Do **not** `source secrets/secrets.env` — bcrypt hashes contain `$`
@@ -64,11 +63,10 @@ This is already implemented and tested in `engine.py` — see
 
 ## 3. What remains
 
-### 3.1 Fix the five failing tests
+### 3.1 Fix the five failing tests — done
 
-All five assert the old session-pointer model. The production code is believed
-correct; these are test updates, but **verify each rather than assuming** — if
-one reveals a real bug, fix the code instead.
+All five old session-pointer expectations now assert the week-based model.
+The full suite passes.
 
 | Test | Why it fails | Fix |
 |---|---|---|
@@ -78,9 +76,9 @@ one reveals a real bug, fix the code instead.
 | `test_service.py::test_dashboard_state_reports_the_plan_as_complete_at_the_end` | Sets `pointer_slug = NULL` | Set `plan_week = 49`; `plan_complete` is now `plan_week > total_plan_weeks` |
 | `test_web.py::test_api_state_reports_the_queue` | `sessions_remaining` key removed from `/api/state` | Assert `weeks_remaining == 48` and `plan_week == 1` |
 
-### 3.2 Add the missing service-level tests
+### 3.2 Add the missing service-level tests — done
 
-Named in the approved plan, not yet written. Put them in `tests/test_service.py`:
+`tests/test_service.py` now covers:
 
 - Perfect adherence ⇒ `plan_week == calendar weeks elapsed + 1`.
 - A sub-floor week does **not** advance `plan_week`, and the same sessions are
@@ -93,7 +91,7 @@ Named in the approved plan, not yet written. Put them in `tests/test_service.py`
   `pointer_slug` set mid-plan), run `db.migrate()`, assert `plan_week` is
   backfilled from that slug's `global_week` and no `session_events` are lost.
 
-### 3.3 Verify by hand
+### 3.3 Verify by hand — pending
 
 ```bash
 .venv/bin/python scripts/reset.py --start 2026-08-03   # empty DB
@@ -107,6 +105,9 @@ Named in the approved plan, not yet written. Put them in `tests/test_service.py`
 3. Open `/plan` — week 1's unfinished optional sessions must read `missed`.
 4. Open `/` — the week list, "week X of 48", and "Race ready by" all render.
 
+The sandbox blocks binding a local port, so this has not been performed in this
+session. The automated suite covers the state transitions.
+
 ### 3.4 Rename `race_date` → `ready_date` (optional, do last)
 
 The user wants this framed as a projected **race-ready** date, never a deadline.
@@ -117,7 +118,7 @@ UI wording is already changed. The identifiers are not:
 means schema v3; renaming only the Python/template layer avoids that. Either is
 fine — do not leave it half-done.
 
-### 3.5 Auto-deploy on push (Part B, not started)
+### 3.5 Auto-deploy on push — done
 
 The Pi's existing runner is bound to `djock/milo-coach`
 (`actions.runner.djock-milo-coach.milo-pi.service`, label `milo-pi`). Runners on
@@ -137,6 +138,10 @@ user-owned repos cannot be shared, so hyrox needs its own.
    `git clean`, so untracked `data/` and gitignored `secrets/` survive) and
    rebuilds only when image inputs changed.
 
+The workflow is present. The dedicated ARM64 runner is installed as
+`actions.runner.djock-hyrox-coach.hyrox-pi.service`, enabled, and online with
+the `hyrox-pi` label.
+
 ## 4. Deploying the migration safely
 
 The live database has real (though currently empty) state and a v1 schema.
@@ -151,7 +156,8 @@ c = db.connect(Path('/tmp/prod-copy.sqlite')); db.migrate(c)
 print(dict(db.fetch_progress(c)))"
 ```
 
-Expect `plan_week` present and sane, and no exception. Then deploy and confirm
+Completed on 2026-08-10: migration succeeded with `plan_week = 1`, pointer
+`p1-w01-s1`, and the expected plan revision. After deployment, confirm
 `https://hyrox.miloprogressive.fit/healthz` returns 200.
 
 ## 5. Context worth knowing

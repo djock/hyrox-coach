@@ -85,7 +85,8 @@ def test_an_undeclared_alternative_is_rejected(conn, plan):
         service.resolve_swap(conn, slug="p1-w01-s2", alternative_slug="p4-w12-s5", plan=plan)
 
 
-def test_only_one_voluntary_swap_per_week(conn, plan):
+def test_only_one_voluntary_swap_per_week(conn, plan, monkeypatch):
+    monkeypatch.setattr(service, "today", lambda: PLAN_START)
     service.log_session(
         conn,
         slug="p1-w01-s4",
@@ -181,7 +182,8 @@ def test_non_running_pain_does_not_trigger_the_run_rule(conn, plan):
 def test_the_substitution_shows_up_in_the_queue(conn, plan):
     _log_painful_run(conn, plan, "p1-w03-s2", PLAN_START)
     _log_painful_run(conn, plan, "p1-w04-s2", PLAN_START + timedelta(days=3))
-    conn.execute("UPDATE progress SET pointer_slug = 'p1-w05-s2'")
+    conn.execute("UPDATE progress SET plan_week = 5")
+    service.log_session(conn, slug="p1-w05-s1", actor="dragos", plan=plan)
 
     up_next = service.current_session(conn, plan)
     assert up_next.is_substitution
@@ -261,6 +263,55 @@ def test_closed_weeks_are_evaluated_once(conn, plan):
     assert first[0].floor_met
 
 
+def test_perfect_adherence_advances_one_plan_week_per_calendar_week(conn, plan):
+    for week in range(4):
+        monday = PLAN_START + timedelta(weeks=week)
+        for offset in range(3):
+            log_next(conn, plan, monday + timedelta(days=offset))
+        service.evaluate_closed_weeks(conn, reference=monday + timedelta(days=7), plan=plan)
+
+    assert db.fetch_progress(conn)["plan_week"] == 5
+
+
+def test_a_sub_floor_week_repeats_the_same_plan_week(conn, plan):
+    offered = [row["session"].slug for row in service.current_week_sessions(conn, plan)]
+    log_next(conn, plan, PLAN_START)
+    log_next(conn, plan, PLAN_START + timedelta(days=1))
+
+    service.evaluate_closed_weeks(conn, reference=PLAN_START + timedelta(days=7), plan=plan)
+
+    assert db.fetch_progress(conn)["plan_week"] == 1
+    assert [row["session"].slug for row in service.current_week_sessions(conn, plan)] == offered
+
+
+def test_unfinished_optional_sessions_expire_when_a_week_closes(conn, plan):
+    optional = {
+        row["session"].slug
+        for row in service.current_week_sessions(conn, plan)
+        if not row["session"].in_floor
+    }
+    for offset in range(3):
+        log_next(conn, plan, PLAN_START + timedelta(days=offset))
+
+    service.evaluate_closed_weeks(conn, reference=PLAN_START + timedelta(days=7), plan=plan)
+
+    assert db.fetch_progress(conn)["plan_week"] == 2
+    assert optional.isdisjoint(
+        row["session"].slug for row in service.current_week_sessions(conn, plan)
+    )
+
+
+def test_a_paused_week_does_not_advance_or_spend_buffer(conn, plan):
+    before = db.fetch_progress(conn)["buffer_weeks"]
+    service.start_pause(conn, kind="holiday", start=PLAN_START, end=PLAN_START + timedelta(days=6))
+
+    service.evaluate_closed_weeks(conn, reference=PLAN_START + timedelta(days=7), plan=plan)
+
+    progress = db.fetch_progress(conn)
+    assert progress["plan_week"] == 1
+    assert progress["buffer_weeks"] == before
+
+
 def test_outcomes_survive_a_later_void(conn, plan):
     """Written once, never recomputed from mutable logs."""
     ids = [log_next(conn, plan, PLAN_START + timedelta(days=i)) for i in range(3)]
@@ -274,23 +325,80 @@ def test_outcomes_survive_a_later_void(conn, plan):
     assert row["sessions_counted"] == 3
 
 
+def test_migration_backfills_plan_week_without_losing_events(tmp_path, plan):
+    path = tmp_path / "v1.sqlite"
+    legacy = db.connect(path)
+    legacy.executescript(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        CREATE TABLE progress (
+            id INTEGER PRIMARY KEY CHECK (id = 1), plan_start TEXT NOT NULL,
+            plan_revision TEXT NOT NULL, pointer_slug TEXT, phase INTEGER NOT NULL,
+            phase_entry_date TEXT NOT NULL, buffer_weeks REAL NOT NULL,
+            baseline_race_date TEXT NOT NULL, projected_race_date TEXT NOT NULL
+        );
+        CREATE TABLE plan_revisions (
+            version TEXT PRIMARY KEY, seeded_at TEXT NOT NULL, session_count INTEGER NOT NULL
+        );
+        CREATE TABLE plan_sessions (
+            slug TEXT NOT NULL, revision TEXT NOT NULL, ordinal INTEGER NOT NULL,
+            phase INTEGER NOT NULL, week_in_phase INTEGER NOT NULL, global_week INTEGER NOT NULL,
+            slot INTEGER NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL,
+            counts_as TEXT NOT NULL, in_floor INTEGER NOT NULL, cap_minutes INTEGER NOT NULL,
+            variant TEXT, detail_json TEXT NOT NULL, alternatives_json TEXT NOT NULL,
+            retired_at TEXT, PRIMARY KEY (slug, revision)
+        );
+        CREATE TABLE session_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL,
+            training_date TEXT NOT NULL
+        );
+        CREATE TABLE week_outcomes (
+            iso_week TEXT PRIMARY KEY, floor_required INTEGER NOT NULL,
+            sessions_counted INTEGER NOT NULL, floor_met INTEGER NOT NULL, status TEXT NOT NULL,
+            buffer_delta REAL NOT NULL, buffer_after REAL NOT NULL,
+            projected_race_date TEXT NOT NULL, detail_json TEXT NOT NULL, evaluated_at TEXT NOT NULL
+        );
+        INSERT INTO schema_version VALUES (1);
+        """
+    )
+    session = plan.session("p1-w05-s2")
+    assert session is not None
+    legacy.execute(
+        "INSERT INTO plan_revisions VALUES (?,?,?)", (plan.version, "2026-08-03T00:00:00+00:00", 240)
+    )
+    legacy.execute(
+        """INSERT INTO plan_sessions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL)""",
+        (
+            session.slug, plan.version, session.ordinal, session.phase, session.week_in_phase,
+            session.global_week, session.slot, session.kind, session.title, session.counts_as,
+            int(session.in_floor), session.cap_minutes, session.variant, "[]", "[]",
+        ),
+    )
+    legacy.execute(
+        "INSERT INTO progress VALUES (1,?,?,?,?,?,?,?,?)",
+        (PLAN_START.isoformat(), plan.version, session.slug, 1, PLAN_START.isoformat(), 4.0,
+         "2027-07-05", "2027-07-05"),
+    )
+    legacy.execute("INSERT INTO session_events (slug, training_date) VALUES (?,?)", (session.slug, PLAN_START.isoformat()))
+
+    db.migrate(legacy)
+
+    assert db.fetch_progress(legacy)["plan_week"] == 5
+    assert legacy.execute("SELECT COUNT(*) AS n FROM session_events").fetchone()["n"] == 1
+
+
 # ----------------------------------------------------------------- phases
 
 
 def test_phase_does_not_advance_without_its_manual_criterion(conn, plan):
-    conn.execute("UPDATE progress SET phase = 1")
-    for i in range(40):
-        log_next(conn, plan, PLAN_START + timedelta(days=i))
-    service.evaluate_closed_weeks(conn, reference=PLAN_START + timedelta(days=70), plan=plan)
+    conn.execute("UPDATE progress SET phase = 1, plan_week = 12")
 
     assert service.advance_phase_if_ready(conn, plan) is False
     assert db.fetch_progress(conn)["phase"] == 1
 
 
 def test_coach_confirmation_can_complete_a_phase(conn, plan):
-    for i in range(40):
-        log_next(conn, plan, PLAN_START + timedelta(days=i))
-    service.evaluate_closed_weeks(conn, reference=PLAN_START + timedelta(days=70), plan=plan)
+    conn.execute("UPDATE progress SET plan_week = 12")
     service.confirm_phase_manual(conn, phase=1, actor="ionut")
 
     status = service.phase_progress(conn, plan)
@@ -372,5 +480,5 @@ def test_week_strip_counts_only_the_current_week(conn, plan):
 
 
 def test_dashboard_state_reports_the_plan_as_complete_at_the_end(conn, plan):
-    conn.execute("UPDATE progress SET pointer_slug = NULL")
+    conn.execute("UPDATE progress SET plan_week = 49")
     assert service.dashboard_state(conn, plan)["plan_complete"] is True

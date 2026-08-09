@@ -299,7 +299,8 @@ def test_offline_replay_requires_a_valid_csrf_token(athlete):
 def test_api_state_reports_the_queue(athlete):
     body = athlete.get("/api/state").json()
     assert body["up_next"] == "p1-w01-s1"
-    assert body["sessions_remaining"] == 240
+    assert body["plan_week"] == 1
+    assert body["weeks_remaining"] == 48
 
 
 # ------------------------------------------------------------------- coach
@@ -338,7 +339,7 @@ def test_coach_can_open_and_close_a_pause(coach, app):
 def test_coach_view_renders_with_no_data(coach):
     page = coach.get("/coach").text
     assert "Dragos" in page
-    assert "No completed weeks yet" in page
+    assert "Nothing logged yet" in page
 
 
 # ----------------------------------------------------------------- assets
