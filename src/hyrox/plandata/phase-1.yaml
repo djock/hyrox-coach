@@ -11,9 +11,9 @@ exit_criteria:
   - key: weeks_at_floor
     value: 8
     label: Eight weeks at three or more sessions
-  - key: sessions_completed
-    value: 30
-    label: Thirty sessions completed
+  - key: plan_week
+    value: 12
+    label: Reaches plan week 12
   - key: manual
     label: >-
       Completes 4 x (5 min jog / 90 s walk) with no next-morning ankle stiffness,

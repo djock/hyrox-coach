@@ -14,9 +14,9 @@ exit_criteria:
   - key: weeks_at_floor
     value: 9
     label: Nine weeks at three or more sessions
-  - key: sessions_completed
-    value: 102
-    label: One hundred and two sessions completed in total
+  - key: plan_week
+    value: 36
+    label: Reaches plan week 36
   - key: manual
     label: >-
       Half-simulation (4 runs + 4 stations) at easy effort, recovered inside

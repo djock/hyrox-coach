@@ -61,21 +61,65 @@ def _utc_now() -> str:
 # --------------------------------------------------------------------------
 
 
-def current_session(conn: sqlite3.Connection, plan: Plan | None = None) -> UpNext | None:
-    """The session at the pointer, with the impact rule already applied.
+def logged_slugs(conn: sqlite3.Connection) -> set[str]:
+    """Slugs with a live completion, including ones stood in for by a swap."""
+    done: set[str] = set()
+    for row in conn.execute(
+        """
+        SELECT slug, substituted_from FROM session_events
+        WHERE voided_at IS NULL AND kind IN ('completed', 'swapped')
+        """
+    ):
+        done.add(row["slug"])
+        if row["substituted_from"]:
+            done.add(row["substituted_from"])
+    return done
 
-    The automatic substitution is resolved at read time rather than written into
-    the queue, so it disappears on its own once the pain stops being reported.
+
+def current_week_sessions(
+    conn: sqlite3.Connection, plan: Plan | None = None
+) -> list[dict[str, Any]]:
+    """This plan week's sessions, floor work first, each tagged with its state.
+
+    Floor sessions sort first so that stopping after three still satisfies the
+    week -- the ordering is what makes "three is a good week" true in practice
+    rather than only on paper.
     """
     plan = plan or load_plan()
     progress = db.fetch_progress(conn)
-    pointer = progress["pointer_slug"]
-    if pointer is None:
-        return None
+    done = logged_slugs(conn)
 
-    session = plan.session(pointer)
-    if session is None:
+    sessions = [s for s in plan.sessions if s.global_week == progress["plan_week"]]
+    sessions.sort(key=lambda s: (not s.in_floor, s.slot))
+
+    rows: list[dict[str, Any]] = []
+    seen_pending = False
+    for session in sessions:
+        if session.slug in done:
+            state = "done"
+        elif not seen_pending:
+            state, seen_pending = "current", True
+        else:
+            state = "pending"
+        rows.append({"session": session, "state": state})
+    return rows
+
+
+def current_session(conn: sqlite3.Connection, plan: Plan | None = None) -> UpNext | None:
+    """The next unfinished session of the current plan week.
+
+    Bounded to the week on purpose. The plan advances a week at a time, so
+    unfinished optional sessions expire at week close instead of accumulating
+    into the backlog the design promised he would never face.
+
+    Returns None when the week is complete -- the UI then says so rather than
+    pulling next week's work forward.
+    """
+    plan = plan or load_plan()
+    upcoming_now = [r for r in current_week_sessions(conn, plan) if r["state"] == "current"]
+    if not upcoming_now:
         return None
+    session = upcoming_now[0]["session"]
 
     if session.counts_as == "run_exposure" and impact_substitution_active(conn):
         for alt in session.alternatives:
@@ -88,20 +132,20 @@ def current_session(conn: sqlite3.Connection, plan: Plan | None = None) -> UpNex
 
 
 def upcoming(conn: sqlite3.Connection, count: int = 7, plan: Plan | None = None) -> list[PlanSession]:
-    plan = plan or load_plan()
-    progress = db.fetch_progress(conn)
-    return list(plan.after(progress["pointer_slug"])[:count])
+    """What is left in this plan week. Never spills into the next one."""
+    rows = current_week_sessions(conn, plan)
+    return [r["session"] for r in rows if r["state"] != "done"][:count]
 
 
-def _advance_pointer(conn: sqlite3.Connection, plan: Plan, from_slug: str) -> None:
-    session = plan.session(from_slug)
-    if session is None:
-        return
-    following = plan.sessions[session.ordinal + 1 :]
-    conn.execute(
-        "UPDATE progress SET pointer_slug = ? WHERE id = 1",
-        (following[0].slug if following else None,),
-    )
+def _refresh_pointer(conn: sqlite3.Connection, plan: Plan) -> None:
+    """Keep `progress.pointer_slug` in step as a cache of the next session.
+
+    Derived, never authoritative: `plan_week` is the position, and only the
+    weekly evaluation moves it.
+    """
+    rows = current_week_sessions(conn, plan)
+    nxt = next((r["session"].slug for r in rows if r["state"] == "current"), None)
+    conn.execute("UPDATE progress SET pointer_slug = ? WHERE id = 1", (nxt,))
 
 
 # --------------------------------------------------------------------------
@@ -192,7 +236,7 @@ def log_session(
             _utc_now(),
         ),
     )
-    _advance_pointer(conn, plan, advance_from)
+    _refresh_pointer(conn, plan)
     return int(cursor.lastrowid)
 
 
@@ -522,9 +566,6 @@ def build_context(
     events = tuple(r for r in records if start <= r.training_date <= end)
     history = tuple(r for r in records if r.training_date < start)
 
-    pointer = progress["pointer_slug"]
-    remaining = len(plan.after(pointer)) if pointer else 0
-
     last = conn.execute(
         "SELECT * FROM week_outcomes WHERE iso_week < ? ORDER BY iso_week DESC LIMIT 1", (label,)
     ).fetchone()
@@ -544,7 +585,8 @@ def build_context(
         pauses=load_pauses(conn),
         benchmarks=load_benchmark_cycles(conn),
         buffer_weeks=float(buffer_weeks),
-        sessions_remaining=remaining,
+        plan_week=progress["plan_week"],
+        total_plan_weeks=sum(p.weeks for p in plan.phases),
         baseline_race_date=date.fromisoformat(progress["baseline_race_date"]),
         previous_projection=previous_projection,
         evaluated_on=today(),
@@ -663,7 +705,7 @@ def phase_progress(conn: sqlite3.Connection, plan: Plan | None = None) -> dict[s
         plan,
         phase,
         outcomes,
-        sessions_completed(conn),
+        progress["plan_week"],
         phase_manual_confirmed(conn, phase.number),
     )
     return {"phase": phase, "complete": complete, "criteria": rows}
@@ -741,22 +783,25 @@ def dashboard_state(conn: sqlite3.Connection, plan: Plan | None = None) -> dict[
     records = _records(conn, plan)
 
     rate = training_rate(tuple(records), today(), float(phase.target))
-    pointer = progress["pointer_slug"]
-    remaining = len(plan.after(pointer)) if pointer else 0
+    total_weeks = sum(p.weeks for p in plan.phases)
+    plan_week = progress["plan_week"]
 
     return {
         "phase": phase,
+        "plan_week": plan_week,
+        "total_plan_weeks": total_weeks,
+        "weeks_remaining": max(0, total_weeks - plan_week + 1),
         "buffer_weeks": progress["buffer_weeks"],
         "baseline_race_date": date.fromisoformat(progress["baseline_race_date"]),
         "projected_race_date": date.fromisoformat(progress["projected_race_date"]),
-        "sessions_remaining": remaining,
         "sessions_completed": sessions_completed(conn),
         "rate": round(rate, 2),
         "pain_stop": active_pain_stop(conn),
         "impact_active": impact_substitution_active(conn),
         "swaps_used": swap_allowance_used(conn),
         "swaps_allowed": VOLUNTARY_SWAPS_PER_WEEK,
-        "plan_complete": pointer is None,
+        "week_complete": current_session(conn, plan) is None,
+        "plan_complete": plan_week > total_weeks,
     }
 
 

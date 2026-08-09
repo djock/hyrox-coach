@@ -37,6 +37,14 @@ RATE_WINDOW_WEEKS = 4
 MAX_SESSIONS_CREDITED_PER_DAY = 2
 MAX_DATE_MOVE_WEEKS = 1.0
 
+# How the plan actually advances: one plan week per calendar week in which the
+# floor was met. `progress_rate` is the fraction of recent weeks that qualified,
+# so 1.0 means the plan and the calendar are moving together and the race date
+# holds. Floored at 0.25 so a long absence cannot project years into the future.
+PROGRESS_WINDOW_WEEKS = 4
+MIN_PROGRESS_RATE = 0.25
+MAX_PROGRESS_RATE = 1.0
+
 BUFFER_CAP = 4.0
 WEEKS_AT_TARGET_FOR_BUFFER = 4
 
@@ -111,7 +119,8 @@ class WeekContext:
     pauses: tuple[PauseWindow, ...]
     benchmarks: tuple[BenchmarkCycle, ...]      # oldest first
     buffer_weeks: float
-    sessions_remaining: int
+    plan_week: int
+    total_plan_weeks: int
     baseline_race_date: date
     previous_projection: date
     evaluated_on: date
@@ -120,6 +129,7 @@ class WeekContext:
 @dataclass(frozen=True)
 class WeekOutcome:
     iso_week: str
+    plan_week: int
     floor_required: int
     sessions_counted: int
     floor_met: bool
@@ -127,6 +137,7 @@ class WeekOutcome:
     buffer_delta: float
     buffer_after: float
     projected_race_date: date
+    advance_plan_week: bool
     detail: dict[str, Any] = field(default_factory=dict)
 
 
@@ -168,13 +179,33 @@ def training_rate(history: tuple[SessionRecord, ...], reference: date, planned: 
     return min(max(rate, MIN_RATE), MAX_RATE)
 
 
-def project_race_date(ctx: WeekContext, buffer_after: float) -> date:
-    """Projected finish, rate-limited so the number stays trustworthy."""
-    rate = training_rate(
-        ctx.history + ctx.events, ctx.week_end, float(ctx.phase.target)
-    )
-    weeks_of_work = ctx.sessions_remaining / rate
-    raw = ctx.week_end + timedelta(days=round(weeks_of_work * 7))
+def progress_rate(prior_outcomes: tuple[PriorOutcome, ...], floor_met_now: bool) -> float:
+    """Plan weeks gained per calendar week, over the recent window.
+
+    This -- not sessions completed -- is what actually moves the finish line: the
+    plan advances a week when the floor is met and repeats it otherwise. Until a
+    full window exists, assume he is keeping up, so a new athlete sees the real
+    target date rather than a pessimistic guess.
+    """
+    recent = [o.floor_met for o in prior_outcomes[-(PROGRESS_WINDOW_WEEKS - 1) :]]
+    recent.append(floor_met_now)
+    if len(recent) < PROGRESS_WINDOW_WEEKS:
+        return MAX_PROGRESS_RATE
+    rate = sum(1 for met in recent if met) / len(recent)
+    return min(max(rate, MIN_PROGRESS_RATE), MAX_PROGRESS_RATE)
+
+
+def project_race_date(ctx: WeekContext, buffer_after: float, floor_met: bool) -> date:
+    """Projected finish, rate-limited so the number stays trustworthy.
+
+    Counted in plan *weeks* remaining, not sessions. The plan holds five sessions
+    a week against a target of four, so a session-based projection implied more
+    than 52 weeks of work even at perfect adherence and walked the date away from
+    the athlete forever.
+    """
+    rate = progress_rate(ctx.prior_outcomes, floor_met)
+    weeks_left = (ctx.total_plan_weeks - ctx.plan_week + 1) / rate
+    raw = ctx.week_end + timedelta(days=round(weeks_left * 7))
     raw -= timedelta(days=round(buffer_after * 7))
 
     # Never earlier than the baseline: buffer protects the date, it cannot beat it.
@@ -292,10 +323,14 @@ def evaluate_week(ctx: WeekContext) -> WeekOutcome:
         verdict=verdict,
     )
 
-    projected = project_race_date(ctx, buffer_after)
+    projected = project_race_date(ctx, buffer_after, floor_met)
+
+    # A paused week is neither progress nor failure: the plan waits where it is.
+    advance = floor_met and not paused
 
     return WeekOutcome(
         iso_week=ctx.iso_week,
+        plan_week=ctx.plan_week,
         floor_required=floor_required,
         sessions_counted=counted,
         floor_met=floor_met,
@@ -303,6 +338,7 @@ def evaluate_week(ctx: WeekContext) -> WeekOutcome:
         buffer_delta=buffer_delta,
         buffer_after=buffer_after,
         projected_race_date=projected,
+        advance_plan_week=advance,
         detail={
             "paused": paused,
             "restarting": restarting,
@@ -348,7 +384,7 @@ def phase_exit_status(
     plan: Plan,
     phase: Phase,
     outcomes: tuple[PriorOutcome, ...],
-    sessions_completed: int,
+    plan_week: int,
     manual_confirmed: bool,
 ) -> tuple[bool, list[dict[str, Any]]]:
     """Whether `phase` is complete, and a per-criterion breakdown for the UI.
@@ -368,15 +404,10 @@ def phase_exit_status(
             rows.append(
                 {"label": criterion.label, "met": met, "have": have, "need": criterion.value}
             )
-        elif criterion.key == "sessions_completed":
-            met = sessions_completed >= (criterion.value or 0)
+        elif criterion.key == "plan_week":
+            met = plan_week >= (criterion.value or 0)
             rows.append(
-                {
-                    "label": criterion.label,
-                    "met": met,
-                    "have": sessions_completed,
-                    "need": criterion.value,
-                }
+                {"label": criterion.label, "met": met, "have": plan_week, "need": criterion.value}
             )
         elif criterion.key == "manual":
             met = manual_confirmed

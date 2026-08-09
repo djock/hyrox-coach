@@ -8,9 +8,9 @@ floor: 3
 target: 4
 cap_minutes: 60
 exit_criteria:
-  - key: sessions_completed
-    value: 138
-    label: One hundred and thirty-eight sessions completed in total
+  - key: plan_week
+    value: 48
+    label: Reaches plan week 48 -- the full year of training
   - key: manual
     label: >-
       8 km continuous at easy effort on a fresh day - the finish-readiness

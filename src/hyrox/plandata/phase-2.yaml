@@ -11,9 +11,9 @@ exit_criteria:
   - key: weeks_at_floor
     value: 9
     label: Nine weeks at three or more sessions
-  - key: sessions_completed
-    value: 66
-    label: Sixty-six sessions completed in total
+  - key: plan_week
+    value: 24
+    label: Reaches plan week 24
   - key: manual
     label: >-
       45 min continuous easy run, 3 x 12 goblet thrusters @ 14 kg, and
