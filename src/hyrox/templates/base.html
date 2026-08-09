@@ -14,12 +14,9 @@
   <header class="topbar">
     <a class="brand" href="/">HYROX</a>
     <nav>
-      {% if principal.is_athlete %}
-        <a href="/checkpoint">Checkpoint</a>
-      {% else %}
-        <a href="/coach">Coach</a>
-        <a href="/checkpoint">Checkpoint</a>
-      {% endif %}
+      <a href="/plan">Plan</a>
+      <a href="/checkpoint">Checkpoint</a>
+      {% if principal.is_coach %}<a href="/coach">Coach</a>{% endif %}
       <form method="post" action="/logout" class="inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button class="linkish" type="submit">Sign out</button>

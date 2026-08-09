@@ -324,6 +324,21 @@ def void(request: Request, event_id: int, csrf_token: str = Form(...)) -> Respon
 # --------------------------------------------------------------------------
 
 
+@router.get("/plan", response_class=HTMLResponse)
+def whole_plan(request: Request) -> Response:
+    """The full twelve months. Read-only, open to both roles."""
+    auth.require_any(request)
+    plan = load_plan()
+    return render(
+        request,
+        "plan.html",
+        {
+            "phases": service.plan_overview(get_conn(request), plan),
+            "total_sessions": len(plan.sessions),
+        },
+    )
+
+
 @router.get("/checkpoint", response_class=HTMLResponse)
 def checkpoint(request: Request) -> Response:
     auth.require_any(request)
@@ -434,15 +449,13 @@ def add_comment(
     csrf_token: str = Form(...),
 ) -> Response:
     principal = verify_csrf(request, csrf_token)
-    if not principal.is_coach:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "coach only")
     from .service import _utc_now
 
     get_conn(request).execute(
         "INSERT INTO comments (event_id, author, body, created_at) VALUES (?,?,?,?)",
         (event_id, principal.username, body.strip(), _utc_now()),
     )
-    return RedirectResponse("/coach", status_code=303)
+    return RedirectResponse("/coach" if principal.is_coach else "/", status_code=303)
 
 
 @router.post("/coach/ack-pain")
@@ -453,12 +466,22 @@ def ack_pain(
     note: str = Form(""),
 ) -> Response:
     principal = verify_csrf(request, csrf_token)
-    if not principal.is_coach:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "coach only")
+    conn = get_conn(request)
+    stop = service.active_pain_stop(conn)
     service.acknowledge_pain_stop(
-        get_conn(request), event_id=event_id, actor=principal.username, note=note or None
+        conn, event_id=event_id, actor=principal.username, note=note or None
     )
-    return RedirectResponse("/coach", status_code=303)
+    # Releasing a pain stop is the athlete's own call, so the observer is told
+    # rather than asked. Silent self-clearance is how a safety rule becomes a
+    # speed bump nobody knows was tapped through.
+    if stop is not None and principal.is_athlete:
+        notify.post(
+            get_config(request).discord_webhook,
+            f"🟡 Dragos resumed training after pain "
+            f"{stop['pain_score']}/10 at the {stop['pain_location']}. "
+            f"Reason given: {note or 'none'}.",
+        )
+    return RedirectResponse("/coach" if principal.is_coach else "/", status_code=303)
 
 
 @router.post("/coach/confirm-phase")
@@ -466,12 +489,10 @@ def confirm_phase(
     request: Request, phase: int = Form(...), csrf_token: str = Form(...)
 ) -> Response:
     principal = verify_csrf(request, csrf_token)
-    if not principal.is_coach:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "coach only")
     conn = get_conn(request)
     service.confirm_phase_manual(conn, phase=phase, actor=principal.username)
     service.advance_phase_if_ready(conn)
-    return RedirectResponse("/coach", status_code=303)
+    return RedirectResponse("/coach" if principal.is_coach else "/", status_code=303)
 
 
 @router.post("/coach/pause")
@@ -484,8 +505,6 @@ def add_pause(
     csrf_token: str = Form(...),
 ) -> Response:
     principal = verify_csrf(request, csrf_token)
-    if not principal.is_coach:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "coach only")
     service.start_pause(
         get_conn(request),
         kind=kind,
@@ -493,16 +512,14 @@ def add_pause(
         end=date.fromisoformat(end) if end.strip() else None,
         note=note or None,
     )
-    return RedirectResponse("/coach", status_code=303)
+    return RedirectResponse("/coach" if principal.is_coach else "/", status_code=303)
 
 
 @router.post("/coach/pause/{pause_id}/end")
 def finish_pause(request: Request, pause_id: int, csrf_token: str = Form(...)) -> Response:
     principal = verify_csrf(request, csrf_token)
-    if not principal.is_coach:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "coach only")
     service.end_pause(get_conn(request), pause_id=pause_id)
-    return RedirectResponse("/coach", status_code=303)
+    return RedirectResponse("/coach" if principal.is_coach else "/", status_code=303)
 
 
 # --------------------------------------------------------------------------

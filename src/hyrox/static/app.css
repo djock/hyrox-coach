@@ -164,3 +164,17 @@ table.weeks td { padding: 8px 4px; border-top: 1px solid var(--line); font-varia
 
 .offline-note { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px;
   background: var(--amber); color: #fff; text-align: center; font-size: 14px; }
+
+/* Whole-plan view */
+details.weekblock { border-top: 1px solid var(--line); padding: 8px 0; }
+details.weekblock summary { cursor: pointer; font-size: 14px; padding: 4px 0; }
+.planlist { list-style: none; padding: 8px 0 8px 12px; margin: 0; }
+.planlist li {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 10px;
+  align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line);
+}
+.planlist li:last-child { border-bottom: 0; }
+.planlist a { color: var(--ink); text-decoration: none; }
+.planlist li.plan-completed a, .planlist li.plan-swapped a { color: var(--muted); text-decoration: line-through; }
+.planlist li.plan-current { background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 8px; padding-inline: 8px; }
+.planlist .small { grid-column: 1; }

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}The whole plan{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>The whole plan</h1>
+  <p class="muted">
+    Twelve months, {{ total_sessions }} sessions. Your daily screen shows one at
+    a time on purpose — this is the map, not the route you have to walk today.
+  </p>
+  <p class="small muted">
+    Nothing here is scheduled to a date. Sessions wait for you, so the finish
+    line moves rather than the work piling up.
+  </p>
+</section>
+
+{% for entry in phases %}
+  <section class="card">
+    <details {% if entry.is_current %}open{% endif %}>
+      <summary>
+        <strong>Phase {{ entry.phase.number }} — {{ entry.phase.name }}</strong>
+        <span class="muted">
+          · months {{ entry.phase.months }} · {{ entry.phase.location }}
+          · {{ entry.done }}/{{ entry.total }} done
+        </span>
+        {% if entry.is_current %}<span class="pill info">now</span>{% endif %}
+      </summary>
+
+      <p class="muted">{{ entry.phase.purpose }}</p>
+      <p class="small muted">
+        Floor {{ entry.phase.floor }} sessions/week · target {{ entry.phase.target }}
+        · sessions capped at {{ entry.phase.cap_minutes }} min
+      </p>
+
+      <h3>Finishing this phase</h3>
+      <ul class="criteria">
+        {% for c in entry.phase.exit_criteria %}<li>○ {{ c.label }}</li>{% endfor %}
+      </ul>
+
+      {% for week in entry.weeks %}
+        <details class="weekblock">
+          <summary>
+            Week {{ week.week_in_phase }}
+            <span class="muted">· overall week {{ week.global_week }} · {{ week.done }}/{{ week.sessions|length }}</span>
+            {% if week.is_benchmark %}<span class="pill amber">checkpoint</span>{% endif %}
+          </summary>
+          <ul class="planlist">
+            {% for row in week.sessions %}
+              <li class="plan-{{ row.status }}">
+                <a href="/session/{{ row.session.slug }}">{{ row.session.title }}</a>
+                <span class="muted small">
+                  {{ row.session.cap_minutes }} min
+                  {% if row.session.in_floor %}· counts to floor{% endif %}
+                </span>
+                <span class="pill {{ 'green' if row.status in ('completed','swapped') else ('info' if row.status == 'current' else '') }}">
+                  {{ row.status }}
+                </span>
+              </li>
+            {% endfor %}
+          </ul>
+        </details>
+      {% endfor %}
+    </details>
+  </section>
+{% endfor %}
+{% endblock %}

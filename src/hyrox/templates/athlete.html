@@ -3,11 +3,29 @@
 {% block content %}
 
 {% if state.pain_stop %}
-  <p class="banner error">
-    You logged pain {{ state.pain_stop.pain_score }}/10 at the
-    {{ state.pain_stop.pain_location }}. That kind of training is paused until
-    your coach reviews it. Everything else is fine to do.
-  </p>
+  <section class="card">
+    <p class="banner error">
+      You logged pain {{ state.pain_stop.pain_score }}/10 at the
+      {{ state.pain_stop.pain_location }} on {{ state.pain_stop.training_date }}.
+      That kind of training is paused. Everything else is fine to do.
+    </p>
+    <details>
+      <summary>Resume this kind of training</summary>
+      <p class="small muted">
+        Your call. Worth being honest with yourself first: pain that keeps
+        coming back is how a twelve-month plan turns into a six-week one.
+        Ionut gets told either way.
+      </p>
+      <form method="post" action="/coach/ack-pain">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="event_id" value="{{ state.pain_stop.event_id }}">
+        <label>What changed?
+          <input name="note" required placeholder="Settled overnight / seen a physio / it was just soreness">
+        </label>
+        <button class="secondary" type="submit">Resume training</button>
+      </form>
+    </details>
+  </section>
 {% endif %}
 
 {% if state.plan_complete %}
@@ -170,5 +188,36 @@
       </li>
     {% endfor %}
   </ul>
+  <form method="post" action="/coach/confirm-phase">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="phase" value="{{ phase_progress.phase.number }}">
+    <button class="secondary" type="submit">I've met the judgement-call criteria</button>
+  </form>
+  <p class="small muted">
+    The counted criteria tick themselves. The last one is a judgement call —
+    confirm it when it's genuinely true and the next phase unlocks.
+  </p>
+  <a class="button" href="/plan">See the whole plan</a>
+</section>
+
+<section class="card">
+  <h2>Taking a break</h2>
+  <p class="small muted">
+    Holiday, illness or injury. A pause suspends the weekly floor and spends no
+    slack — it's how a planned break stops looking like giving up.
+  </p>
+  <form method="post" action="/coach/pause" class="row">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Reason
+      <select name="kind">
+        <option value="holiday">Holiday</option>
+        <option value="illness">Illness</option>
+        <option value="injury">Injury</option>
+      </select>
+    </label>
+    <label>From <input name="start" type="date" value="{{ today }}" required></label>
+    <label>Until <input name="end" type="date"></label>
+    <button class="secondary" type="submit">Pause</button>
+  </form>
 </section>
 {% endblock %}

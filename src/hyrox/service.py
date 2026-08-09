@@ -760,6 +760,62 @@ def dashboard_state(conn: sqlite3.Connection, plan: Plan | None = None) -> dict[
     }
 
 
+def plan_overview(conn: sqlite3.Connection, plan: Plan | None = None) -> list[dict[str, Any]]:
+    """The whole twelve months, grouped phase → week → session.
+
+    The queue deliberately shows one session at a time so he never faces a
+    backlog, but that is no reason to hide the plan. This is the read-only
+    counterpart: everything, with what has already happened marked on it.
+    """
+    plan = plan or load_plan()
+    progress = db.fetch_progress(conn)
+    pointer = progress["pointer_slug"]
+
+    outcome_by_slug: dict[str, str] = {}
+    for row in conn.execute(
+        """
+        SELECT slug, kind, substituted_from FROM session_events
+        WHERE voided_at IS NULL ORDER BY id
+        """
+    ):
+        outcome_by_slug[row["slug"]] = row["kind"]
+        if row["substituted_from"]:
+            outcome_by_slug[row["substituted_from"]] = "swapped"
+
+    phases: list[dict[str, Any]] = []
+    for phase in plan.phases:
+        weeks: list[dict[str, Any]] = []
+        for week in range(1, phase.weeks + 1):
+            sessions = [
+                s for s in plan.sessions if s.phase == phase.number and s.week_in_phase == week
+            ]
+            rows = []
+            for session in sessions:
+                status = outcome_by_slug.get(session.slug, "pending")
+                if session.slug == pointer:
+                    status = "current"
+                rows.append({"session": session, "status": status})
+            weeks.append(
+                {
+                    "week_in_phase": week,
+                    "global_week": sessions[0].global_week if sessions else 0,
+                    "sessions": rows,
+                    "is_benchmark": any(s.kind == "benchmark" for s in sessions),
+                    "done": sum(1 for r in rows if r["status"] in ("completed", "swapped")),
+                }
+            )
+        phases.append(
+            {
+                "phase": phase,
+                "weeks": weeks,
+                "is_current": phase.number == progress["phase"],
+                "done": sum(w["done"] for w in weeks),
+                "total": sum(len(w["sessions"]) for w in weeks),
+            }
+        )
+    return phases
+
+
 def benchmark_table(conn: sqlite3.Connection, plan: Plan | None = None) -> dict[str, Any]:
     """Latest cycle against the one before, per test, for the progress bars."""
     plan = plan or load_plan()

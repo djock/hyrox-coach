@@ -6,6 +6,8 @@ import re
 
 from fastapi.testclient import TestClient
 
+from hyrox import service
+
 from conftest import ATHLETE_PW, COACH_PW
 
 
@@ -74,19 +76,51 @@ def test_athlete_cannot_reach_the_coach_view(athlete):
     assert athlete.get("/coach").status_code == 403
 
 
-def test_athlete_cannot_comment(athlete):
+def test_athlete_owns_his_own_plan(athlete, app):
+    """No coach hierarchy: Dragos releases his own pain stop.
+
+    Deliberately his call rather than a gated one -- it is his body. The app
+    still records who cleared it and why, and still tells the observer.
+    """
     response = athlete.post(
-        "/coach/comment",
-        data={"event_id": 1, "body": "hi", "csrf_token": token(athlete)},
+        "/complete",
+        data={"slug": "p1-w01-s2", "csrf_token": token(athlete)},
+        follow_redirects=False,
     )
-    assert response.status_code == 403
+    event_id = int(response.headers["location"].rsplit("/", 1)[1])
+    athlete.post(
+        f"/log/{event_id}",
+        data={"csrf_token": token(athlete), "pain_score": "7", "pain_location": "knee"},
+    )
+    conn = app.state.conn
+    assert service.active_pain_stop(conn) is not None
+
+    athlete.post(
+        "/coach/ack-pain",
+        data={"event_id": event_id, "csrf_token": token(athlete), "note": "settled overnight"},
+    )
+    assert service.active_pain_stop(conn) is None
+    ack = conn.execute("SELECT * FROM acknowledgements WHERE kind = 'pain_stop'").fetchone()
+    assert ack["actor"] == "dragos" and ack["note"] == "settled overnight"
 
 
-def test_athlete_cannot_acknowledge_their_own_pain_stop(athlete):
-    response = athlete.post(
-        "/coach/ack-pain", data={"event_id": 1, "csrf_token": token(athlete)}
+def test_athlete_can_confirm_a_phase_criterion(athlete, app):
+    athlete.post("/coach/confirm-phase", data={"phase": 1, "csrf_token": token(athlete)})
+    assert service.phase_manual_confirmed(app.state.conn, 1)
+
+
+def test_athlete_can_pause_his_own_training(athlete, app):
+    athlete.post(
+        "/coach/pause",
+        data={
+            "kind": "holiday",
+            "start": "2026-08-10",
+            "end": "",
+            "csrf_token": token(athlete),
+        },
     )
-    assert response.status_code == 403
+    row = app.state.conn.execute("SELECT * FROM pause_windows").fetchone()
+    assert row["kind"] == "holiday"
 
 
 def test_coach_cannot_use_the_athlete_logging_screen(coach):
@@ -321,3 +355,53 @@ def test_manifest_is_public(client):
     response = client.get("/manifest.webmanifest")
     assert response.status_code == 200
     assert response.json()["short_name"] == "Hyrox"
+
+
+# --------------------------------------------------------------- whole plan
+
+
+def test_plan_view_shows_every_phase_and_session(athlete):
+    page = athlete.get("/plan").text
+    assert "The whole plan" in page
+    assert "240 sessions" in page
+    for name in ("Show up", "Engine and leg capacity", "Stations and partner", "Rehearse and taper"):
+        assert name in page
+
+
+def test_plan_view_marks_what_has_happened(athlete):
+    athlete.post("/complete", data={"slug": "p1-w01-s1", "csrf_token": token(athlete)})
+    page = athlete.get("/plan").text
+    assert "plan-completed" in page
+    assert "plan-current" in page
+
+
+def test_plan_view_is_open_to_the_coach_too(coach):
+    assert coach.get("/plan").status_code == 200
+
+
+def test_plan_view_links_to_session_detail(athlete):
+    assert '/session/p1-w01-s1' in athlete.get("/plan").text
+
+
+def test_releasing_a_pain_stop_notifies_the_observer(athlete, app, monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        "hyrox.web.notify.post", lambda webhook, content: sent.append(content) or True
+    )
+    object.__setattr__(app.state.config, "discord_webhook", "https://example.invalid/hook")
+
+    response = athlete.post(
+        "/complete",
+        data={"slug": "p1-w01-s2", "csrf_token": token(athlete)},
+        follow_redirects=False,
+    )
+    event_id = int(response.headers["location"].rsplit("/", 1)[1])
+    athlete.post(
+        f"/log/{event_id}",
+        data={"csrf_token": token(athlete), "pain_score": "6", "pain_location": "shin"},
+    )
+    athlete.post(
+        "/coach/ack-pain",
+        data={"event_id": event_id, "csrf_token": token(athlete), "note": "felt fine after"},
+    )
+    assert any("resumed training after pain 6/10 at the shin" in m for m in sent)
