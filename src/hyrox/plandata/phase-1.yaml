@@ -1,0 +1,147 @@
+phase: 1
+name: Show up
+purpose: Build the habit, restore impact tolerance, learn to squat and hinge.
+months: 1-3
+location: home
+weeks: 12
+floor: 3
+target: 4
+cap_minutes: 40
+exit_criteria:
+  - key: weeks_at_floor
+    value: 8
+    label: Eight weeks at three or more sessions
+  - key: sessions_completed
+    value: 30
+    label: Thirty sessions completed
+  - key: manual
+    label: >-
+      Completes 4 x (5 min jog / 90 s walk) with no next-morning ankle stiffness,
+      and 3 x 10 bodyweight squats to a box with clean form
+
+slots:
+  - slot: 1
+    kind: strength
+    variant: A
+    title: Strength A
+    counts_as: strength
+    in_floor: true
+    detail:
+      - name: Goblet squat to box
+        prescription: 2 x 8 @ 10 kg
+        note: Sit to the box, stand up. Heels elevated on a book if depth is hard.
+      - name: Goblet thruster
+        prescription: 3 x 8 @ 8 kg
+        note: This is the wall ball pattern. Squat, stand, press overhead in one move.
+      - name: DB floor press
+        prescription: 2 x 10
+        note: Lying on the floor, upper arms stop when elbows touch down.
+      - name: Single-arm DB row
+        prescription: 2 x 10 / side
+        note: Free hand on a chair. Pull to the hip, not the armpit.
+      - name: Dead bug
+        prescription: 2 x 8 / side
+        note: Lower back stays flat on the floor the whole time.
+
+  - slot: 2
+    kind: run
+    title: Run / walk
+    counts_as: run_exposure
+    in_floor: true
+    alternative:
+      slot: 4
+      reason: impact
+    by_week:
+      1:
+        title: Ankle prep + 30 min brisk walk
+        detail:
+          - name: Single-leg balance
+            prescription: 3 x 30 s / side
+          - name: Eccentric heel drops off a step
+            prescription: 3 x 10 / side
+            note: Two seconds down. Push back up with both feet.
+          - name: Brisk walk
+            prescription: 30 min
+            note: No jogging for the first two weeks. Tendons first.
+      3:
+        title: 6 x (1 min jog / 2 min walk)
+        detail:
+          - name: Warm-up walk
+            prescription: 5 min
+          - name: Intervals
+            prescription: 6 x (1 min jog / 2 min walk)
+            note: The jog should feel absurdly easy. That is correct.
+      5:
+        title: 8 x (1 min jog / 2 min walk)
+        detail:
+          - name: Warm-up walk
+            prescription: 5 min
+          - name: Intervals
+            prescription: 8 x (1 min jog / 2 min walk)
+      7:
+        title: 6 x (2 min jog / 90 s walk)
+        detail:
+          - name: Warm-up walk
+            prescription: 5 min
+          - name: Intervals
+            prescription: 6 x (2 min jog / 90 s walk)
+      9:
+        title: 5 x (3 min jog / 90 s walk)
+        detail:
+          - name: Warm-up walk
+            prescription: 5 min
+          - name: Intervals
+            prescription: 5 x (3 min jog / 90 s walk)
+      11:
+        title: 4 x (5 min jog / 90 s walk)
+        detail:
+          - name: Warm-up walk
+            prescription: 5 min
+          - name: Intervals
+            prescription: 4 x (5 min jog / 90 s walk)
+            note: Repeat this week rather than progress if anything aches next morning.
+
+  - slot: 3
+    kind: strength
+    variant: B
+    title: Strength B
+    counts_as: strength
+    in_floor: true
+    detail:
+      - name: DB Romanian deadlift
+        prescription: 2 x 10
+        note: Push the hips back. The bar path stays close to the legs.
+      - name: Reverse lunge
+        prescription: 2 x 8 / leg, bodyweight
+      - name: DB overhead press
+        prescription: 2 x 10
+      - name: Farmers carry
+        prescription: 3 x 20 m @ 2 x 14 kg
+        note: Tall posture. Do not let the shoulders round forward.
+      - name: Calf raise
+        prescription: 2 x 15
+        note: Ankle and calf resilience. Do not skip these.
+      - name: Single-leg balance
+        prescription: 2 x 30 s / side
+
+  - slot: 4
+    kind: bike
+    title: Bike Zone 2
+    counts_as: aerobic
+    in_floor: false
+    cap_minutes: 30
+    detail:
+      - name: Stationary bike
+        prescription: 30 min easy
+        note: Conversational. You should be able to speak in full sentences.
+
+  - slot: 5
+    kind: mobility
+    title: Easy walk or mobility
+    counts_as: recovery
+    in_floor: false
+    cap_minutes: 30
+    detail:
+      - name: Walk or mobility
+        prescription: 30 min
+        note: Optional and genuinely easy. Movement, not training.

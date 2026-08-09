@@ -1,0 +1,136 @@
+phase: 4
+name: Rehearse and taper
+purpose: Prove finish-readiness, rehearse the split, arrive healthy.
+months: 10-12
+location: gym
+weeks: 12
+floor: 3
+target: 4
+cap_minutes: 60
+exit_criteria:
+  - key: sessions_completed
+    value: 138
+    label: One hundred and thirty-eight sessions completed in total
+  - key: manual
+    label: >-
+      8 km continuous at easy effort on a fresh day - the finish-readiness
+      threshold - and a 90% rehearsal completed at race loads
+
+slots:
+  - slot: 1
+    kind: strength
+    variant_alternates: true
+    title: Strength {variant} - maintenance
+    counts_as: strength
+    in_floor: true
+    detail_by_variant:
+      A:
+        - name: Squat
+          prescription: 2 x 8, comfortable load
+          note: Maintenance. Nothing heavy this close to the race.
+        - name: Wall balls
+          prescription: 4 x 20 @ 6 kg
+        - name: Incline DB press
+          prescription: 2 x 10
+        - name: Cable row
+          prescription: 2 x 10
+      B:
+        - name: DB Romanian deadlift
+          prescription: 2 x 8, comfortable load
+        - name: Sandbag lunge
+          prescription: 4 x 25 m @ 20 kg
+        - name: Lat pulldown
+          prescription: 2 x 10
+        - name: Farmers carry
+          prescription: 4 x 50 m @ 2 x 24 kg
+
+  - slot: 2
+    kind: run
+    title: Partner run quality
+    counts_as: run_exposure
+    in_floor: true
+    cap_minutes: 60
+    alternative:
+      slot: 5
+      reason: impact
+    by_week:
+      1:
+        title: Partner run - 4 x 1 km at race effort
+        detail:
+          - name: Warm-up
+            prescription: 10 min easy
+          - name: Repeats
+            prescription: 4 x 1 km at projected race effort, 90 s between
+      5:
+        title: Partner run - 6 x 1 km at race effort
+        detail:
+          - name: Warm-up
+            prescription: 10 min easy
+          - name: Repeats
+            prescription: 6 x 1 km at projected race effort, 90 s between
+      9:
+        title: Taper run - easy with strides
+        detail:
+          - name: Easy run
+            prescription: 20-25 min
+          - name: Strides
+            prescription: 4 x 20 s relaxed
+            note: Race week. Nothing hard, nothing new, nothing to prove.
+
+  - slot: 3
+    kind: partner
+    title: Partner Hyrox session
+    counts_as: partner
+    in_floor: true
+    cap_minutes: 60
+    by_week:
+      1:
+        title: Rehearsal build - 70% volume
+        detail:
+          - name: Full-format rehearsal
+            prescription: 8 x 1 km runs + all stations at 70% volume
+            note: >-
+              Deliberately easy. Revise the station split from what actually
+              happened, not from what you planned.
+      5:
+        title: Rehearsal - 90% at race loads
+        detail:
+          - name: Full rehearsal
+            prescription: 90% volume at race loads
+            note: >-
+              No faster than target finish effort. Stop if form fails. Then
+              nothing hard for ten days.
+      9:
+        title: Taper - short station practice
+        detail:
+          - name: Station practice
+            prescription: 40% volume, race loads
+            note: Sharpness only. Leave feeling fresh.
+
+  - slot: 4
+    kind: run
+    title: Easy run
+    counts_as: run_exposure
+    in_floor: false
+    cap_minutes: 60
+    alternative:
+      slot: 5
+      reason: impact
+    detail:
+      - name: Easy run
+        prescription: 45-60 min
+        note: >-
+          Build toward 8 km continuous at easy effort. That is the
+          finish-readiness threshold - continuous, not fast.
+
+  - slot: 5
+    kind: bike
+    title: Recovery bike and mobility
+    counts_as: recovery
+    in_floor: false
+    cap_minutes: 30
+    detail:
+      - name: Stationary bike
+        prescription: 20 min very easy
+      - name: Mobility
+        prescription: 10 min

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ session.title }}{% endblock %}
+{% block content %}
+<section class="card">
+  <p class="eyebrow">
+    Phase {{ session.phase }} · week {{ session.week_in_phase }} ·
+    {{ session.cap_minutes }} min cap
+  </p>
+  <h1>{{ session.title }}</h1>
+
+  <ol class="detail">
+    {% for item in session.detail %}
+      <li>
+        <strong>{{ item.name }}</strong>
+        {% if item.prescription %}<span class="dose">{{ item.prescription }}</span>{% endif %}
+        {% if item.note %}<span class="note">{{ item.note }}</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ol>
+
+  {% if alternatives %}
+    <h2>Declared alternatives</h2>
+    <ul class="criteria">
+      {% for alt in alternatives %}
+        <li>{{ alt.title }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <a class="button" href="/">Back</a>
+</section>
+{% endblock %}

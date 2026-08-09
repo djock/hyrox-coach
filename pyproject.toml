@@ -1,0 +1,49 @@
+[project]
+name = "hyrox-coach"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "bcrypt>=4.1",
+    "itsdangerous>=2.2",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "time-machine>=2.14",
+]
+
+[project.scripts]
+hyrox-job = "hyrox.jobs:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# Every extension the site serves must be listed: StaticFiles reads from the
+# INSTALLED package, so anything missing here 404s in the container while
+# working fine from a source checkout. Same trap milo_coach documents.
+hyrox = [
+    "templates/*.html",
+    "static/*.css",
+    "static/*.js",
+    "static/*.png",
+    "static/*.svg",
+    "static/*.webmanifest",
+    "plandata/*.yaml",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
+testpaths = ["tests"]

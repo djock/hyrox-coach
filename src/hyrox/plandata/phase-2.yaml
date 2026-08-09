@@ -1,0 +1,167 @@
+phase: 2
+name: Engine and leg capacity
+purpose: Aerobic base, and the leg endurance wall balls and lunges will demand.
+months: 4-6
+location: home
+weeks: 12
+floor: 3
+target: 4
+cap_minutes: 50
+exit_criteria:
+  - key: weeks_at_floor
+    value: 9
+    label: Nine weeks at three or more sessions
+  - key: sessions_completed
+    value: 66
+    label: Sixty-six sessions completed in total
+  - key: manual
+    label: >-
+      45 min continuous easy run, 3 x 12 goblet thrusters @ 14 kg, and
+      4 x 25 m walking lunge @ 2 x 14 kg unbroken
+
+slots:
+  - slot: 1
+    kind: strength
+    variant: A
+    title: Strength A + thrusters
+    counts_as: strength
+    in_floor: true
+    detail:
+      - name: Goblet squat
+        prescription: 3 x 10 @ 14 kg
+        note: Three seconds down. The tempo is the progression now the load is capped.
+      - name: Goblet thruster
+        prescription: 3 x 12 @ 14 kg
+        note: Still the wall ball pattern. Breathe at the top, not the bottom.
+      - name: DB floor press
+        prescription: 3 x 10-12
+      - name: Single-arm DB row
+        prescription: 3 x 10-12 / side
+      - name: Dead bug
+        prescription: 3 x 10 / side
+
+  - slot: 2
+    kind: run
+    title: Long easy run
+    counts_as: run_exposure
+    in_floor: true
+    cap_minutes: 50
+    alternative:
+      slot: 4
+      reason: impact
+    by_week:
+      1:
+        title: Long easy run - 30 min
+        detail:
+          - name: Continuous easy run
+            prescription: 30 min
+            note: Conversational throughout. Walk if you need to, it still counts.
+      3:
+        title: Long easy run - 35 min
+        detail:
+          - name: Continuous easy run
+            prescription: 35 min
+      5:
+        title: Long easy run - 38 min
+        detail:
+          - name: Continuous easy run
+            prescription: 38 min
+      7:
+        title: Long easy run - 40 min
+        detail:
+          - name: Continuous easy run
+            prescription: 40 min
+      9:
+        title: Long easy run - 43 min
+        detail:
+          - name: Continuous easy run
+            prescription: 43 min
+      11:
+        title: Long easy run - 45 min
+        detail:
+          - name: Continuous easy run
+            prescription: 45 min
+            note: No further than this. Duration is capped, frequency is the goal.
+
+  - slot: 3
+    kind: strength
+    variant: B
+    title: Strength B + lunges and carries
+    counts_as: strength
+    in_floor: true
+    detail:
+      - name: DB Romanian deadlift
+        prescription: 3 x 10-12
+        note: Three seconds down.
+      - name: Walking lunge
+        prescription: 3 x 12 / leg @ 2 x 14 kg
+        note: The sandbag lunge station is 100 m. This is how you build it.
+      - name: Bulgarian split squat
+        prescription: 3 x 8 / leg @ 2 x 14 kg
+        note: Rear foot on a chair. These are meant to be hard.
+      - name: DB overhead press
+        prescription: 3 x 10-12
+      - name: Farmers carry
+        prescription: 4 x 40 m @ 2 x 14 kg
+      - name: Calf raise
+        prescription: 3 x 15
+
+  - slot: 4
+    kind: bike
+    title: Bike Zone 2 or intervals
+    counts_as: aerobic
+    in_floor: false
+    cap_minutes: 35
+    by_week:
+      1:
+        title: Bike Zone 2 - 30 min
+        detail:
+          - name: Stationary bike
+            prescription: 30 min easy
+      9:
+        title: Bike intervals
+        detail:
+          - name: Warm-up
+            prescription: 8 min easy
+          - name: Intervals
+            prescription: 6 x (2 min hard / 2 min easy)
+            note: >-
+              This is the SkiErg and Row engine, built without an erg. The
+              technique comes later; the fitness transfers.
+          - name: Cool-down
+            prescription: 5 min easy
+
+  - slot: 5
+    kind: run
+    title: Second easy run
+    counts_as: run_exposure
+    in_floor: false
+    cap_minutes: 30
+    alternative:
+      slot: 4
+      reason: impact
+    by_week:
+      1:
+        title: Second easy run
+        detail:
+          - name: Easy run
+            prescription: 25-30 min
+            note: Easier than the long run. If in doubt, slower.
+      5:
+        title: Easy run + burpee broad jumps
+        detail:
+          - name: Easy run
+            prescription: 25 min
+          - name: Burpee broad jumps
+            prescription: 6 x 5 m
+            note: >-
+              Technique only. Stop the set the moment a landing gets sloppy.
+              One of the few stations that needs no equipment at all.
+      9:
+        title: Easy run + burpee broad jumps
+        detail:
+          - name: Easy run
+            prescription: 25 min
+          - name: Burpee broad jumps
+            prescription: 8 x 5 m
+            note: Extend distance before adding density.

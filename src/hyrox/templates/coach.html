@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Coach{% endblock %}
+{% block content %}
+
+{% if state.pain_stop %}
+  <section class="card">
+    <p class="banner error">
+      Pain {{ state.pain_stop.pain_score }}/10 at the
+      {{ state.pain_stop.pain_location }} on {{ state.pain_stop.training_date }}.
+      Training of that kind is halted until you acknowledge this.
+    </p>
+    <form method="post" action="/coach/ack-pain">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="event_id" value="{{ state.pain_stop.event_id }}">
+      <label>Note <input name="note" placeholder="Spoke to him / seen a physio / fine to continue"></label>
+      <button class="primary" type="submit">Acknowledge and resume</button>
+    </form>
+  </section>
+{% endif %}
+
+<section class="card">
+  <h1>Dragos</h1>
+  <div class="stats">
+    <div><span class="stat">{{ streak }}</span><span class="statlabel">week streak at floor</span></div>
+    <div><span class="stat">{{ state.rate }}</span><span class="statlabel">sessions/week lately</span></div>
+    <div><span class="stat">{{ '%g'|format(state.buffer_weeks) }}</span><span class="statlabel">weeks of slack</span></div>
+    <div><span class="stat">{{ state.sessions_completed }}</span><span class="statlabel">sessions done</span></div>
+  </div>
+  <p class="muted">
+    Projected race day <strong>{{ state.projected_race_date.strftime('%d %B %Y') }}</strong>
+    (baseline {{ state.baseline_race_date.strftime('%d %B %Y') }}) ·
+    {{ state.sessions_remaining }} sessions remaining
+    {% if state.impact_active %}
+      · <strong>impact substitution active</strong> — runs are going to the bike
+    {% endif %}
+  </p>
+</section>
+
+<section class="card">
+  <h2>Phase {{ phase_progress.phase.number }}: {{ phase_progress.phase.name }}</h2>
+  <ul class="criteria">
+    {% for row in phase_progress.criteria %}
+      <li class="{% if row.met %}met{% endif %}">
+        {% if row.met %}✓{% else %}○{% endif %} {{ row.label }}
+        {% if row.need %}<span class="muted">({{ row.have }}/{{ row.need }})</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+  <form method="post" action="/coach/confirm-phase">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="phase" value="{{ phase_progress.phase.number }}">
+    <button class="secondary" type="submit">Confirm the manual criteria are met</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Weeks</h2>
+  <table class="weeks">
+    <thead>
+      <tr><th>Week</th><th>Done</th><th>Status</th><th>Slack</th><th>Projected</th></tr>
+    </thead>
+    <tbody>
+      {% for row in outcomes %}
+        <tr class="status-{{ row.status }}">
+          <td>{{ row.iso_week }}</td>
+          <td>{{ row.sessions_counted }}/{{ row.floor_required }}</td>
+          <td><span class="pill {{ row.status }}">{{ row.status }}</span></td>
+          <td>{{ '%g'|format(row.buffer_after) }}</td>
+          <td>{{ row.projected_race_date }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="muted">No completed weeks yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>Benchmarks</h2>
+  {% if benchmarks.tested %}
+    {% for test in benchmarks.tests %}
+      <div class="bench">
+        <span class="bench-name">{{ test.name }}</span>
+        <span class="bench-value">
+          {% if test.current is not none %}{{ '%g'|format(test.current) }} {{ test.unit }}
+          {% else %}<span class="muted">not tested</span>{% endif %}
+        </span>
+        {% if test.change_pct is not none %}
+          <span class="delta {% if test.change_pct >= 0 %}up{% else %}down{% endif %}">
+            {{ '%+.0f'|format(test.change_pct) }}%
+          </span>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="muted">No cycles recorded yet.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Pauses</h2>
+  <form method="post" action="/coach/pause" class="row">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Kind
+      <select name="kind">
+        <option value="holiday">Holiday</option>
+        <option value="illness">Illness</option>
+        <option value="injury">Injury</option>
+      </select>
+    </label>
+    <label>From <input name="start" type="date" value="{{ today }}" required></label>
+    <label>To <input name="end" type="date"></label>
+    <button class="secondary" type="submit">Add pause</button>
+  </form>
+  <p class="small muted">
+    A pause suspends the floor and spends no slack. It is how a holiday stops
+    looking like quitting.
+  </p>
+  <ul class="criteria">
+    {% for p in pauses %}
+      <li>
+        {{ p.kind }} — {{ p.start_date }} to {{ p.end_date or 'open' }}
+        {% if not p.end_date %}
+          <form method="post" action="/coach/pause/{{ p.id }}/end" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="linkish" type="submit">End now</button>
+          </form>
+        {% endif %}
+      </li>
+    {% else %}
+      <li class="muted">None.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card">
+  <h2>Recent sessions</h2>
+  {% for e in events %}
+    <article class="event {% if e.kind == 'skipped' %}skipped{% endif %}">
+      <header>
+        <strong>{{ e.snapshot.title }}</strong>
+        <span class="muted">{{ e.training_date }}</span>
+        {% if e.kind == 'skipped' %}<span class="pill amber">skipped: {{ e.skip_reason }}</span>{% endif %}
+        {% if e.substituted_from %}
+          <span class="pill info">{{ e.substitution_reason }} swap</span>
+        {% endif %}
+        {% if e.pain_score %}
+          <span class="pill {% if e.pain_score >= 5 %}red{% else %}amber{% endif %}">
+            pain {{ e.pain_score }} {{ e.pain_location or '' }}
+          </span>
+        {% endif %}
+        {% if e.rpe %}<span class="muted">RPE {{ e.rpe }}</span>{% endif %}
+      </header>
+      {% if e.note %}<p class="note">{{ e.note }}</p>{% endif %}
+      <form method="post" action="/coach/comment" class="row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="event_id" value="{{ e.id }}">
+        <input name="body" placeholder="Comment{% if e.comment_count %} ({{ e.comment_count }} so far){% endif %}">
+        <button class="linkish" type="submit">Send</button>
+      </form>
+    </article>
+  {% else %}
+    <p class="muted">Nothing logged yet.</p>
+  {% endfor %}
+</section>
+{% endblock %}

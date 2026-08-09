@@ -1,0 +1,71 @@
+# The monthly battery. Four tests, about 25 minutes, submaximal throughout --
+# he is beating last month, not testing a maximum. Runs every fourth ISO week,
+# replacing a normal session.
+#
+# Deliberately NOT a maximal battery: monthly 5RM squats and 1000 m time trials
+# on a detrained beginner building connective tissue is an injury vector.
+
+home:
+  label: Home battery (months 1-6)
+  tests:
+    - key: run_12min
+      name: 12-minute run
+      unit: m
+      higher_is_better: true
+      protocol: >-
+        Fixed route, even effort, RPE 7. Not all-out. Same shoes, same route,
+        same time of day every month.
+      also_record: [avg_hr, rpe]
+    - key: thrusters
+      name: Goblet thrusters
+      unit: reps
+      higher_is_better: true
+      protocol: Max unbroken @ 14 kg. Stop at the first form break. Cap 40.
+    - key: farmers
+      name: Farmers carry
+      unit: m
+      higher_is_better: true
+      protocol: Max unbroken @ 2 x 14 kg. Cap 200 m.
+    - key: split_squat
+      name: Bulgarian split squat
+      unit: reps/leg
+      higher_is_better: true
+      protocol: Max clean reps per leg @ 2 x 14 kg. Stop at RPE 8.
+
+gym:
+  label: Gym battery (months 7-12)
+  tests:
+    - key: run_12min
+      name: 12-minute run
+      unit: m
+      higher_is_better: true
+      protocol: Unchanged from the home battery, so the trend runs the whole year.
+      also_record: [avg_hr, rpe]
+    - key: wall_balls
+      name: Wall balls
+      unit: reps
+      higher_is_better: true
+      protocol: Max unbroken @ 6 kg to 3.05 m. Cap 50.
+    - key: farmers
+      name: Farmers carry
+      unit: m
+      higher_is_better: true
+      protocol: Max unbroken @ 2 x 24 kg. Cap 200 m.
+    - key: sandbag_lunge
+      name: Sandbag lunge
+      unit: m
+      higher_is_better: true
+      protocol: Max unbroken @ 20 kg. Cap 100 m.
+
+# Recorded every cycle regardless of battery.
+always:
+  - key: body_mass
+    name: Body mass
+    unit: kg
+    higher_is_better: null
+    protocol: Morning, after the toilet, before food.
+  - key: worst_pain
+    name: Worst pain this month
+    unit: 0-10
+    higher_is_better: false
+    protocol: Score and location.

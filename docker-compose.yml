@@ -1,0 +1,23 @@
+services:
+  hyrox:
+    build: .
+    restart: unless-stopped
+    # format: raw stops compose interpolating $-sequences inside bcrypt hashes
+    env_file:
+      - path: secrets/secrets.env
+        format: raw
+    environment:
+      HYROX_DB_PATH: /data/hyrox.sqlite
+      HYROX_BACKUP_DIR: /data/backups
+    volumes:
+      - ./data:/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    env_file:
+      - path: secrets/secrets.env
+        format: raw
+    depends_on:
+      - hyrox

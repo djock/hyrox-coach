@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Today{% endblock %}
+{% block content %}
+
+{% if state.pain_stop %}
+  <p class="banner error">
+    You logged pain {{ state.pain_stop.pain_score }}/10 at the
+    {{ state.pain_stop.pain_location }}. That kind of training is paused until
+    your coach reviews it. Everything else is fine to do.
+  </p>
+{% endif %}
+
+{% if state.plan_complete %}
+  <section class="card">
+    <h1>That's the plan finished.</h1>
+    <p>Every session done. Go and race.</p>
+  </section>
+{% elif up_next %}
+  <section class="card session-card">
+    <p class="eyebrow">
+      Phase {{ state.phase.number }} — {{ state.phase.name }}
+      · {{ up_next.session.cap_minutes }} min
+    </p>
+
+    {% if up_next.is_substitution %}
+      <p class="banner info">
+        Swapped to the bike automatically. You've reported the same pain twice
+        after running, so this one is off your feet.
+      </p>
+    {% endif %}
+
+    <h1>{{ up_next.session.title }}</h1>
+
+    <ol class="detail">
+      {% for item in up_next.session.detail %}
+        <li>
+          <strong>{{ item.name }}</strong>
+          {% if item.prescription %}<span class="dose">{{ item.prescription }}</span>{% endif %}
+          {% if item.note %}<span class="note">{{ item.note }}</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+
+    <form method="post" action="/complete" class="done-form"
+          data-offline-complete data-slug="{{ up_next.session.slug }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="slug" value="{{ up_next.session.slug }}">
+      <input type="hidden" name="idempotency_key" value="">
+      {% if up_next.is_substitution %}
+        <input type="hidden" name="substituted_from" value="{{ up_next.substituted_for.slug }}">
+        <input type="hidden" name="substitution_reason" value="impact">
+      {% endif %}
+      <button class="primary big" type="submit">Done</button>
+    </form>
+
+    <p class="hint">
+      You can stop after ten minutes and it still counts. Starting is the whole job.
+    </p>
+
+    <details class="options">
+      <summary>Can't do this one</summary>
+
+      {% if up_next.session.alternatives and not up_next.is_substitution %}
+        <form method="post" action="/swap">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="slug" value="{{ up_next.session.slug }}">
+          <p class="muted">
+            Swap for a declared alternative
+            ({{ state.swaps_allowed - state.swaps_used }} left this week):
+          </p>
+          {% for alt in up_next.session.alternatives %}
+            <button class="secondary" type="submit" name="alternative" value="{{ alt.slug }}"
+                    {% if state.swaps_used >= state.swaps_allowed %}disabled{% endif %}>
+              Do the {{ alt.reason }} alternative instead
+            </button>
+          {% endfor %}
+        </form>
+      {% endif %}
+
+      <form method="post" action="/skip">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="slug" value="{{ up_next.session.slug }}">
+        <label>Not today, because
+          <select name="reason">
+            <option value="tired">Too tired</option>
+            <option value="busy">No time</option>
+            <option value="sore">Sore</option>
+            <option value="unwell">Unwell</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <button class="secondary" type="submit">Skip today</button>
+        <p class="muted small">
+          Nothing is lost — this session waits for you. Saying so just means
+          your coach sees a reason instead of silence.
+        </p>
+      </form>
+    </details>
+  </section>
+{% endif %}
+
+<section class="card">
+  <h2>This week</h2>
+  <div class="strip">
+    {% for day in strip.days %}
+      <div class="cell {% if day.done %}done{% elif day.skipped %}skipped{% endif %}
+                  {% if day.is_today %}today{% endif %}">
+        <span class="dow">{{ day.label }}</span>
+        <span class="mark">{% if day.done %}✓{% elif day.skipped %}–{% endif %}</span>
+      </div>
+    {% endfor %}
+  </div>
+  <p class="floor {% if strip.floor_met %}met{% endif %}">
+    {{ strip.counted }} of {{ strip.floor }}
+    {% if strip.floor_met %}
+      — floor hit. This week is a success whatever else happens.
+    {% else %}
+      — {{ strip.floor - strip.counted }} more to make this a good week.
+    {% endif %}
+  </p>
+</section>
+
+<section class="card">
+  <h2>Race day</h2>
+  <p class="bigdate">{{ state.projected_race_date.strftime('%d %B %Y') }}</p>
+  <p class="muted">
+    {{ '%g'|format(state.buffer_weeks) }} week{{ '' if state.buffer_weeks == 1 else 's' }}
+    of slack left · {{ state.sessions_remaining }} sessions to go ·
+    training {{ state.rate }}×/week lately
+  </p>
+  {% if state.buffer_weeks > 0 %}
+    <p class="small muted">
+      Missed weeks spend slack before the date moves. The date only slides once
+      the slack is gone.
+    </p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Monthly checkpoint</h2>
+  {% if benchmarks.tested %}
+    {% for test in benchmarks.tests %}
+      <div class="bench">
+        <span class="bench-name">{{ test.name }}</span>
+        <span class="bench-value">
+          {% if test.current is not none %}{{ '%g'|format(test.current) }} {{ test.unit }}
+          {% else %}<span class="muted">—</span>{% endif %}
+        </span>
+        {% if test.change_pct is not none %}
+          <span class="delta {% if test.change_pct >= 0 %}up{% else %}down{% endif %}">
+            {{ '%+.0f'|format(test.change_pct) }}%
+          </span>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="muted">Not tested yet. Nothing is blocked by that.</p>
+  {% endif %}
+  <a class="button" href="/checkpoint">Record a checkpoint</a>
+</section>
+
+<section class="card">
+  <h2>Phase {{ phase_progress.phase.number }}: {{ phase_progress.phase.name }}</h2>
+  <p class="muted">{{ phase_progress.phase.purpose }}</p>
+  <ul class="criteria">
+    {% for row in phase_progress.criteria %}
+      <li class="{% if row.met %}met{% endif %}">
+        {% if row.met %}✓{% else %}○{% endif %} {{ row.label }}
+        {% if row.need %}<span class="muted">({{ row.have }}/{{ row.need }})</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

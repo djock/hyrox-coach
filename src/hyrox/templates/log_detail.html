@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Logged{% endblock %}
+{% block content %}
+<section class="card">
+  <p class="eyebrow">Logged</p>
+  <h1>{{ snapshot.title }}</h1>
+  <p class="muted">
+    That's it — the session is saved. Everything below is optional.
+  </p>
+
+  <form method="post" action="/log/{{ event.id }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <label>How long did it take? (minutes)
+      <input name="duration_min" type="number" inputmode="numeric" min="1" max="240"
+             placeholder="{{ event.duration_min }}">
+    </label>
+
+    <label>How hard was it? (1 easy — 10 everything)
+      <input name="rpe" type="range" min="1" max="10" step="1" value="5"
+             oninput="this.nextElementSibling.value = this.value">
+      <output>5</output>
+    </label>
+
+    {% if prompt_pain %}
+      <fieldset class="pain">
+        <legend>Anything hurt?</legend>
+        <label>Pain (0 none — 10 severe)
+          <input name="pain_score" type="range" min="0" max="10" step="1" value="0"
+                 oninput="this.nextElementSibling.value = this.value">
+          <output>0</output>
+        </label>
+        <label>Where?
+          <select name="pain_location">
+            <option value="">Nowhere</option>
+            {% for loc in pain_locations %}
+              <option value="{{ loc }}">{{ loc }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <p class="small muted">
+          Report it honestly. Two run sessions with the same ache and the app
+          moves your next run to the bike by itself.
+        </p>
+      </fieldset>
+    {% endif %}
+
+    <label>Note
+      <textarea name="note" rows="2" placeholder="Optional"></textarea>
+    </label>
+
+    <button class="primary" type="submit">Save</button>
+    <a class="button secondary" href="/">Skip this</a>
+  </form>
+
+  <form method="post" action="/void/{{ event.id }}" class="void">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="linkish danger" type="submit">Tapped that by mistake — undo it</button>
+  </form>
+</section>
+{% endblock %}

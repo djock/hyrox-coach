@@ -1,0 +1,148 @@
+phase: 3
+name: Stations and partner
+purpose: All eight stations, compromised running, and training as a pair.
+months: 7-9
+location: gym
+weeks: 12
+floor: 3
+target: 4
+cap_minutes: 60
+entry_criteria:
+  - key: manual
+    label: Gym membership active, and the partner's Hyrox block has started
+exit_criteria:
+  - key: weeks_at_floor
+    value: 9
+    label: Nine weeks at three or more sessions
+  - key: sessions_completed
+    value: 102
+    label: One hundred and two sessions completed in total
+  - key: manual
+    label: >-
+      Half-simulation (4 runs + 4 stations) at easy effort, recovered inside
+      48 h, and a written station split agreed with the partner
+
+slots:
+  - slot: 1
+    kind: strength
+    variant_alternates: true
+    title: Strength {variant}
+    counts_as: strength
+    in_floor: true
+    detail_by_variant:
+      A:
+        - name: Goblet or barbell-free squat
+          prescription: 3 x 8-10, loaded
+        - name: Wall balls
+          prescription: 4 x 15 @ 6 kg to 3.05 m
+          note: >-
+            At 1.90 m this target is a short throw for you. This is your best
+            station - take the larger share of the 100 reps on race day.
+        - name: Incline DB press
+          prescription: 3 x 8-12
+        - name: Cable row
+          prescription: 3 x 10-12
+        - name: Dead bug
+          prescription: 2 x 10 / side
+      B:
+        - name: DB Romanian deadlift
+          prescription: 3 x 8-10, loaded
+        - name: Sandbag lunge
+          prescription: 4 x 25 m @ 20 kg
+        - name: Lat pulldown
+          prescription: 3 x 10-12
+        - name: DB shoulder press
+          prescription: 3 x 8-12
+        - name: Farmers carry
+          prescription: 4 x 50 m @ 2 x 24 kg
+        - name: Calf raise
+          prescription: 3 x 12-15
+
+  - slot: 2
+    kind: run
+    title: Compromised running
+    counts_as: run_exposure
+    in_floor: true
+    cap_minutes: 55
+    alternative:
+      slot: 5
+      reason: impact
+    by_week:
+      1:
+        title: Compromised running - 4 x (800 m + wall balls)
+        detail:
+          - name: Warm-up
+            prescription: 10 min easy
+          - name: Couplets
+            prescription: 4 x (800 m easy run + 15 wall balls)
+            note: Keep the run easy. You are learning the transition, not suffering.
+      5:
+        title: Compromised running - 5 x (1 km + station)
+        detail:
+          - name: Warm-up
+            prescription: 10 min easy
+          - name: Couplets
+            prescription: 5 x (1 km easy run + one station at ~50% race volume)
+            note: Rotate the station each round.
+      9:
+        title: Compromised running - 6 x (1 km + station)
+        detail:
+          - name: Warm-up
+            prescription: 10 min easy
+          - name: Couplets
+            prescription: 6 x (1 km easy run + one station at ~60% race volume)
+
+  - slot: 3
+    kind: partner
+    title: Partner session
+    counts_as: partner
+    in_floor: true
+    cap_minutes: 60
+    detail:
+      - name: Runs together
+        prescription: 4-6 x 500-800 m
+        note: >-
+          At D's pace, always. If the partner needs a harder run he does it
+          separately. A stronger partner turning easy runs into a competition
+          is the most common way a mismatched doubles pair fails.
+      - name: Station splits
+        prescription: Alternating blocks, 20-25 min
+        note: Practise the 20-50 m regroup after each station.
+      - name: Sled push
+        prescription: 6 x 12.5 m
+        note: >-
+          A load that lets you march continuously. Progress to about 60% of
+          race load and stop - the partner takes 65-75% of the sleds on race day.
+      - name: Sled pull
+        prescription: 6 x 12.5 m
+        note: Upright posture, hand over hand, controlled backward steps.
+
+  - slot: 4
+    kind: run
+    title: Easy run
+    counts_as: run_exposure
+    in_floor: false
+    cap_minutes: 50
+    alternative:
+      slot: 5
+      reason: impact
+    detail:
+      - name: Easy run
+        prescription: 40-50 min
+        note: Genuinely easy. This is aerobic maintenance, not a workout.
+
+  - slot: 5
+    kind: bike
+    title: Erg technique and mobility
+    counts_as: aerobic
+    in_floor: false
+    cap_minutes: 30
+    detail:
+      - name: SkiErg
+        prescription: 5 x 2 min easy
+        note: Hinge and pull rhythm. Technique only - the engine is already built.
+      - name: Row
+        prescription: 5 x 2 min easy
+        note: Legs, then back, then arms. Reverse on the recovery.
+      - name: Mobility
+        prescription: 10 min

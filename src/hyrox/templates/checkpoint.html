@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Checkpoint{% endblock %}
+{% block content %}
+<section class="card">
+  <p class="eyebrow">Cycle {{ cycle }} · {{ phase.location }} battery</p>
+  <h1>Monthly checkpoint</h1>
+  <p class="muted">
+    Four tests, about 25 minutes. Submaximal — you're beating last month, not
+    testing a maximum. Leave anything blank that you didn't do.
+  </p>
+
+  <form method="post" action="/checkpoint">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="cycle" value="{{ cycle }}">
+
+    {% for test in table.tests %}
+      <fieldset>
+        <legend>{{ test.name }}</legend>
+        <p class="small muted">{{ test.protocol }}</p>
+        <label>Result ({{ test.unit }})
+          <input name="test_{{ test.key }}" type="number" step="any" inputmode="decimal"
+                 value="{% if test.current is not none %}{{ '%g'|format(test.current) }}{% endif %}">
+        </label>
+        {% if test.previous is not none %}
+          <p class="small muted">Last time: {{ '%g'|format(test.previous) }} {{ test.unit }}</p>
+        {% endif %}
+      </fieldset>
+    {% endfor %}
+
+    {% for item in always %}
+      <fieldset>
+        <legend>{{ item.name }}</legend>
+        <p class="small muted">{{ item.protocol }}</p>
+        <label>Value ({{ item.unit }})
+          <input name="test_{{ item.key }}" type="number" step="any" inputmode="decimal">
+        </label>
+      </fieldset>
+    {% endfor %}
+
+    <button class="primary" type="submit">Save checkpoint</button>
+  </form>
+</section>
+{% endblock %}
