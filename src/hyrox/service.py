@@ -598,13 +598,14 @@ def persist_outcome(conn: sqlite3.Connection, outcome: WeekOutcome) -> None:
     conn.execute(
         """
         INSERT INTO week_outcomes (
-            iso_week, floor_required, sessions_counted, floor_met, status,
+            iso_week, plan_week, floor_required, sessions_counted, floor_met, status,
             buffer_delta, buffer_after, projected_race_date, detail_json, evaluated_at
-        ) VALUES (?,?,?,?,?,?,?,?,?,?)
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT (iso_week) DO NOTHING
         """,
         (
             outcome.iso_week,
+            outcome.plan_week,
             outcome.floor_required,
             outcome.sessions_counted,
             int(outcome.floor_met),
@@ -620,6 +621,8 @@ def persist_outcome(conn: sqlite3.Connection, outcome: WeekOutcome) -> None:
         "UPDATE progress SET buffer_weeks = ?, projected_race_date = ? WHERE id = 1",
         (outcome.buffer_after, outcome.projected_race_date.isoformat()),
     )
+    if outcome.advance_plan_week:
+        conn.execute("UPDATE progress SET plan_week = plan_week + 1 WHERE id = 1")
 
 
 def evaluate_closed_weeks(
@@ -649,6 +652,8 @@ def evaluate_closed_weeks(
             outcomes.append(outcome)
         monday += timedelta(days=7)
 
+    if outcomes:
+        _refresh_pointer(conn, plan)
     return outcomes
 
 
@@ -815,6 +820,7 @@ def plan_overview(conn: sqlite3.Connection, plan: Plan | None = None) -> list[di
     plan = plan or load_plan()
     progress = db.fetch_progress(conn)
     pointer = progress["pointer_slug"]
+    plan_week = progress["plan_week"]
 
     outcome_by_slug: dict[str, str] = {}
     for row in conn.execute(
@@ -836,7 +842,12 @@ def plan_overview(conn: sqlite3.Connection, plan: Plan | None = None) -> list[di
             ]
             rows = []
             for session in sessions:
-                status = outcome_by_slug.get(session.slug, "pending")
+                status = outcome_by_slug.get(session.slug)
+                if status is None:
+                    # A week the plan has already left behind, with nothing
+                    # logged, is genuinely missed -- it will never come round
+                    # again, and saying "pending" would be a lie.
+                    status = "missed" if session.global_week < plan_week else "pending"
                 if session.slug == pointer:
                     status = "current"
                 rows.append({"session": session, "status": status})
@@ -846,6 +857,7 @@ def plan_overview(conn: sqlite3.Connection, plan: Plan | None = None) -> list[di
                     "global_week": sessions[0].global_week if sessions else 0,
                     "sessions": rows,
                     "is_benchmark": any(s.kind == "benchmark" for s in sessions),
+                    "is_current": sessions[0].global_week == plan_week if sessions else False,
                     "done": sum(1 for r in rows if r["status"] in ("completed", "swapped")),
                 }
             )

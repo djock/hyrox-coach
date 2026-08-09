@@ -128,6 +128,7 @@ def home(request: Request) -> Response:
             "up_next": up_next,
             "state": state,
             "strip": service.week_strip(conn),
+            "week_sessions": service.current_week_sessions(conn, plan),
             "benchmarks": service.benchmark_table(conn, plan),
             "phase_progress": service.phase_progress(conn, plan),
         },
@@ -571,7 +572,8 @@ def api_state(request: Request) -> JSONResponse:
             "up_next": up_next.session.slug if up_next else None,
             "buffer_weeks": state["buffer_weeks"],
             "projected_race_date": state["projected_race_date"].isoformat(),
-            "sessions_remaining": state["sessions_remaining"],
+            "plan_week": state["plan_week"],
+            "weeks_remaining": state["weeks_remaining"],
         }
     )
 

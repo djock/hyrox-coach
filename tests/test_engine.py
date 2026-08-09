@@ -12,6 +12,7 @@ import pytest
 
 from hyrox.engine import (
     BUFFER_CAP,
+    MIN_PROGRESS_RATE,
     MAX_RATE,
     MIN_RATE,
     BenchmarkCycle,
@@ -20,6 +21,7 @@ from hyrox.engine import (
     SessionRecord,
     WeekContext,
     evaluate_week,
+    progress_rate,
     training_rate,
 )
 from hyrox.plan import load_plan
@@ -51,7 +53,8 @@ def context(**overrides) -> WeekContext:
         pauses=(),
         benchmarks=(),
         buffer_weeks=4.0,
-        sessions_remaining=100,
+        plan_week=1,
+        total_plan_weeks=48,
         baseline_race_date=date(2027, 8, 2),
         previous_projection=date(2027, 8, 2),
         evaluated_on=MONDAY + timedelta(days=7),
@@ -119,13 +122,13 @@ def test_floor_credit_is_capped_at_two_sessions_per_day():
 
 def test_projection_never_moves_more_than_a_week_per_evaluation():
     """A date that swings by months and snaps back destroys trust in it."""
-    ctx = context(sessions_remaining=200, buffer_weeks=0.0, events=())
+    ctx = context(plan_week=1, buffer_weeks=0.0, events=())
     outcome = evaluate_week(ctx)
     assert abs((outcome.projected_race_date - ctx.previous_projection).days) <= 7
 
 
 def test_projection_never_beats_the_baseline():
-    ctx = context(sessions_remaining=1, buffer_weeks=4.0)
+    ctx = context(plan_week=48, buffer_weeks=4.0)
     outcome = evaluate_week(ctx)
     assert outcome.projected_race_date >= ctx.baseline_race_date
 
@@ -266,3 +269,75 @@ def test_evaluate_week_is_idempotent():
     events = tuple(record(MONDAY + timedelta(days=i)) for i in range(3))
     ctx = context(events=events)
     assert evaluate_week(ctx) == evaluate_week(ctx)
+
+
+# ------------------------------------------------- week-based progression
+
+
+def test_progress_rate_bootstraps_optimistically():
+    """A new athlete should see the real target date, not a pessimistic guess."""
+    assert progress_rate((), True) == 1.0
+    assert progress_rate(outcomes((3, True)), True) == 1.0
+
+
+def test_progress_rate_counts_weeks_where_the_floor_was_met():
+    prior = outcomes((3, True), (0, False), (3, True))
+    assert progress_rate(prior, True) == 0.75
+    assert progress_rate(prior, False) == 0.5
+
+
+def test_progress_rate_is_floored():
+    prior = outcomes((0, False), (0, False), (0, False))
+    assert progress_rate(prior, False) == MIN_PROGRESS_RATE
+
+
+def test_perfect_adherence_holds_the_baseline_date():
+    """The regression this whole model exists for.
+
+    The old session-based projection walked the date a week later every week
+    even at perfect adherence, because the plan holds five sessions a week
+    against a target of four. Counting plan weeks instead, keeping up means the
+    date does not move.
+    """
+    events = tuple(record(MONDAY + timedelta(days=i)) for i in range(4))
+    ctx = context(
+        plan_week=12,
+        events=events,
+        prior_outcomes=outcomes((4, True), (4, True), (4, True)),
+        buffer_weeks=4.0,
+    )
+    outcome = evaluate_week(ctx)
+    assert outcome.floor_met
+    assert outcome.projected_race_date == ctx.baseline_race_date
+
+
+def test_falling_behind_pushes_the_date_out():
+    ctx = context(
+        plan_week=12,
+        events=(),
+        prior_outcomes=outcomes((0, False), (0, False), (0, False)),
+        buffer_weeks=0.0,
+    )
+    assert evaluate_week(ctx).projected_race_date > ctx.baseline_race_date
+
+
+def test_meeting_the_floor_advances_the_plan_week():
+    events = tuple(record(MONDAY + timedelta(days=i)) for i in range(3))
+    assert evaluate_week(context(events=events)).advance_plan_week is True
+
+
+def test_missing_the_floor_does_not_advance_the_plan_week():
+    """The policy table's "repeat the week's loads, no progression" rule."""
+    assert evaluate_week(context(events=(record(MONDAY),))).advance_plan_week is False
+
+
+def test_a_paused_week_neither_advances_nor_penalises():
+    pause = PauseWindow("holiday", MONDAY, MONDAY + timedelta(days=6))
+    outcome = evaluate_week(context(events=(), pauses=(pause,)))
+    assert outcome.advance_plan_week is False
+    assert outcome.buffer_delta == 0.0
+
+
+def test_the_outcome_records_which_plan_week_it_was():
+    outcome = evaluate_week(context(plan_week=7, events=()))
+    assert outcome.plan_week == 7

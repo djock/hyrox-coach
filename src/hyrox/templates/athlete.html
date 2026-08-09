@@ -31,12 +31,22 @@
 {% if state.plan_complete %}
   <section class="card">
     <h1>That's the plan finished.</h1>
-    <p>Every session done. Go and race.</p>
+    <p>Forty-eight weeks done. You're race ready.</p>
   </section>
-{% elif up_next %}
+{% elif not up_next %}
+  <section class="card">
+    <h1>Week {{ state.plan_week }} is done.</h1>
+    <p class="muted">
+      Everything this week is logged. Nothing carries over and there's nothing
+      to catch up — the next week opens on Monday.
+    </p>
+    <a class="button" href="/plan">See what's coming</a>
+  </section>
+{% else %}
   <section class="card session-card">
     <p class="eyebrow">
       Phase {{ state.phase.number }} — {{ state.phase.name }}
+      · week {{ state.plan_week }} of {{ state.total_plan_weeks }}
       · {{ up_next.session.cap_minutes }} min
     </p>
 
@@ -139,17 +149,39 @@
 </section>
 
 <section class="card">
-  <h2>Race day</h2>
+  <h2>This week's sessions</h2>
+  <ul class="weeklist">
+    {% for row in week_sessions %}
+      <li class="wk-{{ row.state }}">
+        <span class="mark">{% if row.state == 'done' %}✓{% else %}○{% endif %}</span>
+        <a href="/session/{{ row.session.slug }}">{{ row.session.title }}</a>
+        <span class="small muted">
+          {{ row.session.cap_minutes }} min{% if row.session.in_floor %} · counts to the floor{% else %} · bonus{% endif %}
+        </span>
+      </li>
+    {% endfor %}
+  </ul>
+  <p class="small muted">
+    Anything left undone on Sunday simply goes. There is never anything to catch up.
+  </p>
+</section>
+
+<section class="card">
+  <h2>Race ready by</h2>
   <p class="bigdate">{{ state.projected_race_date.strftime('%d %B %Y') }}</p>
   <p class="muted">
     {{ '%g'|format(state.buffer_weeks) }} week{{ '' if state.buffer_weeks == 1 else 's' }}
-    of slack left · {{ state.sessions_remaining }} sessions to go ·
+    of slack left · {{ state.weeks_remaining }} weeks of training to go ·
     training {{ state.rate }}×/week lately
   </p>
   {% if state.buffer_weeks > 0 %}
     <p class="small muted">
-      Missed weeks spend slack before the date moves. The date only slides once
-      the slack is gone.
+      A forecast, not a deadline. Missed weeks spend slack first — the date only
+      starts moving once the slack is gone.
+    </p>
+  {% else %}
+    <p class="small muted">
+      Slack is spent, so from here a missed week pushes this date back by one.
     </p>
   {% endif %}
 </section>

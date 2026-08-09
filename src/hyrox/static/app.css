@@ -178,3 +178,18 @@ details.weekblock summary { cursor: pointer; font-size: 14px; padding: 4px 0; }
 .planlist li.plan-completed a, .planlist li.plan-swapped a { color: var(--muted); text-decoration: line-through; }
 .planlist li.plan-current { background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 8px; padding-inline: 8px; }
 .planlist .small { grid-column: 1; }
+
+/* This week's session list */
+.weeklist { list-style: none; padding: 0; margin: 0; }
+.weeklist li {
+  display: grid; grid-template-columns: 24px 1fr; gap: 2px 8px;
+  padding: 10px 0; border-bottom: 1px solid var(--line); align-items: baseline;
+}
+.weeklist li:last-child { border-bottom: 0; }
+.weeklist .mark { grid-row: span 2; font-size: 18px; color: var(--muted); }
+.weeklist li.wk-done .mark { color: var(--green); }
+.weeklist li.wk-done a { color: var(--muted); text-decoration: line-through; }
+.weeklist li.wk-current a { font-weight: 700; }
+.weeklist a { color: var(--ink); text-decoration: none; }
+.weeklist .small { grid-column: 2; }
+.planlist li.plan-missed a { color: var(--muted); opacity: .7; }

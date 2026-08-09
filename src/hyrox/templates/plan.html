@@ -40,6 +40,7 @@
         <details class="weekblock">
           <summary>
             Week {{ week.week_in_phase }}
+            {% if week.is_current %}<span class="pill info">this week</span>{% endif %}
             <span class="muted">· overall week {{ week.global_week }} · {{ week.done }}/{{ week.sessions|length }}</span>
             {% if week.is_benchmark %}<span class="pill amber">checkpoint</span>{% endif %}
           </summary>
@@ -51,7 +52,9 @@
                   {{ row.session.cap_minutes }} min
                   {% if row.session.in_floor %}· counts to floor{% endif %}
                 </span>
-                <span class="pill {{ 'green' if row.status in ('completed','swapped') else ('info' if row.status == 'current' else '') }}">
+                <span class="pill {{ 'green' if row.status in ('completed','swapped')
+                     else ('info' if row.status == 'current'
+                     else ('amber' if row.status in ('missed','skipped') else '')) }}">
                   {{ row.status }}
                 </span>
               </li>

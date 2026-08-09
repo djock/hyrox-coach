@@ -27,9 +27,9 @@
     <div><span class="stat">{{ state.sessions_completed }}</span><span class="statlabel">sessions done</span></div>
   </div>
   <p class="muted">
-    Projected race day <strong>{{ state.projected_race_date.strftime('%d %B %Y') }}</strong>
+    Race ready by <strong>{{ state.projected_race_date.strftime('%d %B %Y') }}</strong>
     (baseline {{ state.baseline_race_date.strftime('%d %B %Y') }}) ·
-    {{ state.sessions_remaining }} sessions remaining
+    week {{ state.plan_week }} of {{ state.total_plan_weeks }}, {{ state.weeks_remaining }} to go
     {% if state.impact_active %}
       · <strong>impact substitution active</strong> — runs are going to the bike
     {% endif %}
@@ -57,19 +57,20 @@
   <h2>Weeks</h2>
   <table class="weeks">
     <thead>
-      <tr><th>Week</th><th>Done</th><th>Status</th><th>Slack</th><th>Projected</th></tr>
+      <tr><th>Week</th><th>Plan wk</th><th>Done</th><th>Status</th><th>Slack</th><th>Ready by</th></tr>
     </thead>
     <tbody>
       {% for row in outcomes %}
         <tr class="status-{{ row.status }}">
           <td>{{ row.iso_week }}</td>
+          <td>{{ row.plan_week }}</td>
           <td>{{ row.sessions_counted }}/{{ row.floor_required }}</td>
           <td><span class="pill {{ row.status }}">{{ row.status }}</span></td>
           <td>{{ '%g'|format(row.buffer_after) }}</td>
           <td>{{ row.projected_race_date }}</td>
         </tr>
       {% else %}
-        <tr><td colspan="5" class="muted">No completed weeks yet.</td></tr>
+        <tr><td colspan="6" class="muted">No completed weeks yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>
